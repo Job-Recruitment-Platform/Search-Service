@@ -1,6 +1,9 @@
 """Search result models"""
+import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -45,9 +48,56 @@ class SearchResult:
     @classmethod
     def from_milvus_hit(cls, hit) -> "SearchResult":
         """Create SearchResult from Milvus search hit"""
-        skills = hit.get("skills", [])
-        if skills:
-            skills = list(skills) if isinstance(skills, (list, tuple)) else []
+        # Extract skills - handle various formats from Milvus
+        # Milvus ARRAY field returns as list/tuple, but might be empty or None
+        skills_raw = hit.get("skills")
+        skills = []
+        
+        # Debug logging
+        logger.debug(f"Raw skills from Milvus: type={type(skills_raw)}, value={skills_raw}, job_id={hit.get('id')}")
+        
+        # Handle None or empty cases
+        if not skills_raw:
+            logger.debug(f"Skills is None or empty for job_id={hit.get('id')}")
+        elif isinstance(skills_raw, (list, tuple)):
+            # Milvus ARRAY field should return as list/tuple
+            if len(skills_raw) > 0:
+                # Convert to list of strings
+                for skill in skills_raw:
+                    if skill is not None:
+                        # Handle both string and object formats
+                        if isinstance(skill, str):
+                            skill_str = skill.strip()
+                            if skill_str:
+                                skills.append(skill_str)
+                        elif isinstance(skill, dict) and "name" in skill:
+                            name = skill.get("name")
+                            if name:
+                                skills.append(str(name).strip())
+                        else:
+                            # Try to convert to string
+                            skill_str = str(skill).strip()
+                            if skill_str and skill_str != "None":
+                                skills.append(skill_str)
+                logger.debug(f"Extracted {len(skills)} skills: {skills}")
+            else:
+                logger.debug(f"Skills array is empty for job_id={hit.get('id')}")
+        else:
+            # Try to convert other types (shouldn't normally happen)
+            logger.warning(f"Unexpected skills type: {type(skills_raw)} for job_id={hit.get('id')}")
+            try:
+                skills_list = list(skills_raw)
+                skills = [str(s).strip() for s in skills_list if s and str(s).strip()]
+            except (TypeError, ValueError) as e:
+                logger.warning(f"Failed to convert skills: {e}, type={type(skills_raw)}")
+                skills = []
+        
+        # Final check - remove any empty strings
+        skills = [s for s in skills if s]
+        
+        # Log if skills is still empty
+        if not skills:
+            logger.debug(f"No skills extracted for job_id={hit.get('id')}, raw_skills={skills_raw}, raw_type={type(skills_raw)}")
 
         return cls(
             id=int(hit["id"]),

@@ -59,6 +59,9 @@ class SearchService:
         
         # Filter results by threshold
         for hit in results:
+            # Debug: log raw hit data
+            logger.debug(f"Raw hit data - id={hit.get('id')}, skills={hit.get('skills')}, skills_type={type(hit.get('skills'))}")
+            
             search_result = SearchResult.from_milvus_hit(hit)
             if search_result.score < Config.SEARCH_SCORE_THRESHOLD:
                 continue
