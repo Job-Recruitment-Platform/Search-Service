@@ -1,0 +1,69 @@
+networks:
+  milvus-system-network:
+    driver: bridge
+
+volumes:
+  milvus-data:
+  etcd-data:
+  minio-data:
+  redis-data:
+
+
+services:
+  # Lưu metadata (schema + index info)
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: etcd
+    command: >
+      etcd
+      --advertise-client-urls=http://0.0.0.0:2379
+      --listen-client-urls=http://0.0.0.0:2379
+      --data-dir=/etcd-data
+      --auto-compaction-mode=revision
+      --auto-compaction-retention=1000
+      --quota-backend-bytes=4294967296
+    ports:
+      - "2379:2379"
+    volumes:
+      - etcd-data:/etcd-data
+    restart: unless-stopped
+    networks: [milvus-system-network]
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health", "--endpoints=http://0.0.0.0:2379"]
+  # Object storage (segment file của milvus)
+  minio:
+    image: minio/minio:RELEASE.2024-03-15T01-07-19Z
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # MinIO console
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+    networks: [milvus-system-network]
+
+  # Milvus standalone
+  milvus:
+    image: milvusdb/milvus:v2.4.8
+    container_name: milvus
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_USE_SSL: "false"
+      MILVUS_LOG_LEVEL: info
+    depends_on:
+      - etcd
+      - minio
+    ports:
+      - "19530:19530" # Milvus gRPC/HTTP
+    volumes:
+      - milvus-data:/var/lib/milvus
+    restart: unless-stopped
+    networks: [milvus-system-network]

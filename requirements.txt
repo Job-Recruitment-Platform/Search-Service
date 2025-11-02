@@ -1,0 +1,6 @@
+pymilvus
+pymilvus[model]
+numpy
+python-dotenv
+flask
+redis
