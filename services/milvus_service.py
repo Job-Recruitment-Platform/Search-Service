@@ -26,7 +26,7 @@ jobs_collection_schema = {
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=False),
         # Basic job info fields for search
         FieldSchema(name="title", dtype=DataType.VARCHAR, max_length=100),
-        FieldSchema(name="skills", dtype=DataType.VARCHAR, max_length=100),
+        FieldSchema(name="skills", dtype=DataType.VARCHAR, max_length=1000),
         FieldSchema(name="location", dtype=DataType.VARCHAR, max_length=100),
         FieldSchema(name="description", dtype=DataType.VARCHAR, max_length=3000),        
         # Filterable fields
@@ -94,9 +94,9 @@ class MilvusService:
 
     def __init__(self):
         self.jobs_collection = None
-        self.user_collection = None
+        self.users_collection = None
         self.ef = None
-        self.dense_dim = 0
+        self.dense_dim = None
         self._setup()
 
     def _setup(self):
@@ -119,6 +119,7 @@ class MilvusService:
             logger.info("Initialized BGEM3 embedding function")
             # Setup collection
             self.jobs_collection = self._setup_collection(jobs_collection_schema)
+            self.users_collection = self._setup_collection(users_collection_schema)
 
         except Exception as e:
             logger.error(f"Failed to connect to Milvus: {e}")
@@ -164,6 +165,36 @@ class MilvusService:
 
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
+            raise
+
+    def get_job_dense_vector(self, job_id: int) -> List[float]:
+        """Fetch dense vector for a job by id. Returns empty list if not found."""
+        try:
+            results = self.jobs_collection.query(
+                expr=f"id == {int(job_id)}",
+                output_fields=["dense_vector"],
+                limit=1,
+            )
+            if results and isinstance(results, list) and "dense_vector" in results[0]:
+                return list(results[0]["dense_vector"])  # type: ignore
+        except Exception as e:
+            logger.warning(f"Failed to fetch dense vector for job {job_id}: {e}")
+        return []
+
+    def upsert_user_vector(self, user_id: int, dense_vector: List[float]) -> None:
+        """Upsert a single user dense vector into the users collection."""
+        try:
+            # Delete existing if any
+            try:
+                self.users_collection.delete(expr=f"id in [{int(user_id)}]")
+            except Exception:
+                pass
+            # Insert new entity
+            entity = {"id": int(user_id), "dense_vector": dense_vector}
+            self.users_collection.insert([entity])
+            logger.info(f"Upserted user vector: user_id={user_id}")
+        except Exception as e:
+            logger.error(f"Failed to upsert user vector for {user_id}: {e}")
             raise
 
     def upsert_jobs(self, entities: List[Dict[str, Any]]) -> int:

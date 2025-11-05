@@ -29,7 +29,9 @@ class SearchService:
         Returns:
             Tuple of (job_ids, pagination_info)
         """
-
+        query = query.lower()
+        logger.info(f"Search query: '{query}'")
+        logger.info(f"Hybrid search with offset={offset}, limit={limit}")
         query_embedding = self.milvus_service.generate_embeddings([query])
         dense_vec = query_embedding.get("dense")[0]
         sparse_vec = query_embedding.get("sparse")[0]
@@ -43,19 +45,19 @@ class SearchService:
             data=[dense_vec],
             anns_field="dense_vector",
             param={"metric_type": "COSINE"},
-            limit=limit+1
+            limit=limit
         )
         
         sparse_req = AnnSearchRequest(
             data=[sparse_vec],
             anns_field="sparse_vector",
             param={"metric_type": "IP"},
-            limit=limit+1
+            limit=limit
         )
         results = self.milvus_service.jobs_collection.hybrid_search(
             reqs=[dense_req, sparse_req],
             rerank=WeightedRanker(float(0.4), float(0.6)),
-            offset=offset,
+            offset=offset * limit,
             limit=limit+1,
             output_fields=["id"],
         )

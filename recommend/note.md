@@ -11,3 +11,6 @@ user vector:
     relocation pref (recommend nhiều khu vực)
     skills = candidate base skills + extract(1-n cv candidate upload)
     education: need cause mot so cong ty sv yeu cau HCMC thay vi blalal T.T -> embedding them
+
+
+sửa lại sync processor khi embedding job: tách ra từng phần rồi weight để phân biệt được đâu quan trọng trong embedding

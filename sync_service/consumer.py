@@ -113,10 +113,7 @@ class RedisStreamConsumer:
                     try:
                         logger.info(
                             f"Processing message {message_id} from stream '{stream}'"
-                        )
-                        logger.info(f"Message fields available: {list(fields.keys())}")
-                        logger.debug(f"Full message data: {fields}")
-                        
+                        )                        
                         # Process the message fields directly
                         # Fields contain: id, aggregateType, aggregateId, eventType,
                         # payload, occurredAt, traceId, attempts

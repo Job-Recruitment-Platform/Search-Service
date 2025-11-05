@@ -30,9 +30,19 @@ class Config:
     # Search configuration
     SEARCH_DEFAULT_LIMIT: int = int(os.getenv("SEARCH_DEFAULT_LIMIT", "10"))
     SEARCH_DEFAULT_OFFSET: int = int(os.getenv("SEARCH_DEFAULT_OFFSET", "0"))
-    SEARCH_THRESHOLD: float = float(os.getenv("SEARCH_THRESHOLD", "0.5"))
+    SEARCH_THRESHOLD: float = float(os.getenv("SEARCH_THRESHOLD", "0.3"))
 
 
-class Weights:
-    """User interaction weights for recommendation scoring"""
-    
+INTERACTION_WEIGHTS = {
+    # Positive signals
+    'APPLY': 1.0, #Strongest positive signal
+    "SAVE": 0.6,  # Medium weight for saving jobs
+    "CLICK": 0.3,  # Light weight for viewing jobs
+    "CLICK_FROM_SIMILAR": 0.2,  # Clicks from similar jobs section
+    "CLICK_FROM_RECOMMENDED": 0.25,  # Clicks from recommended jobs section
+    "CLICK_FROM_SEARCH": 0.4,  # Clicks from search results
+    # Negative signals
+    "SKIP_FROM_SIMILAR": -0.05,  # Skip from similar jobs section
+    "SKIP_FROM_RECOMMENDED": -0.15,  # Skip from recommended jobs section
+    "SKIP_FROM_SEARCH": -0.1,  # Skip from search
+}

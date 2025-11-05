@@ -7,7 +7,7 @@ from utils.data_processor import DataProcessor
 from models.job import Job
 from models.event import OutboxEvent
 from models.sync import SyncResult
-
+import numpy as np
 logger = logging.getLogger(__name__)
 
 
@@ -22,18 +22,37 @@ class SyncProcessor:
         try:
             job = Job.from_dict(payload)
             # Sparse: only title + skills + location
-            sparse_text = DataProcessor.combine_job_text(job.to_dict(False))
-            logger.info(sparse_text)
-            # Dense: description only
-            dense_text = job.description
-            logger.info(dense_text)
+            common_text = DataProcessor.combine_job_text(job.to_dict(False)).lower()
+            
+            # Dense
+            texts = [
+                job.title.lower(),
+                DataProcessor.extract_skill_names(job.skills).lower(),
+                job.location.lower(),
+                job.description.lower(),
+            ]
+            
+            embeddings = self.milvus_service.generate_embeddings(texts)
+            title_dense, skills_dense, location_dense, description_dense = embeddings["dense"]
             # Generate embeddings (expects list[str])
-            sparse_vec = self.milvus_service.generate_embeddings([sparse_text]).get("sparse")
-            dense_vec = self.milvus_service.generate_embeddings([dense_text]).get("dense")
+            sparse_vec = self.milvus_service.generate_embeddings([common_text]).get("sparse")[0]
+            
+            dense_vecs = [title_dense, skills_dense, location_dense, description_dense]
+            dense_weights = np.array([0.3, 0.4, 0.1, 0.2])
+            
+            valid = [i for i, vec in enumerate(dense_vecs) if vec is not None]
+            if not valid:
+                raise ValueError("Failed to generate any dense embeddings for job")
+            
+            dense_vecs = [dense_vecs[i] for i in valid]
+            dense_weights = dense_weights[valid]
+            dense_weights = dense_weights / np.sum(dense_weights)
+            
+            combined_dense_vec = np.average(dense_vecs, axis=0, weights=dense_weights)
             
             # Build single-entity upsert payload
             entities = DataProcessor.build_entities(
-                dense_vecs=dense_vec,
+                dense_vecs=[combined_dense_vec],
                 sparse_vecs=sparse_vec,
                 jobs=[job.to_dict(False)],
             )
