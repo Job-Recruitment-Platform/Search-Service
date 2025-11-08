@@ -28,11 +28,13 @@ def create_routes(app: Flask, search_service: SearchService):
         limit = int(data.get("limit", Config.SEARCH_DEFAULT_LIMIT))
         offset = int(data.get("offset", Config.SEARCH_DEFAULT_OFFSET))
         threshold = float(data.get("threshold", Config.SEARCH_THRESHOLD))
+        filters = data.get("filters", None)
         try:
             job_ids, pagination = search_service.search(
                 query=query,
                 limit=limit,
                 offset=offset,
+                filters=filters,
                 threshold=threshold,
             )
             return jsonify({

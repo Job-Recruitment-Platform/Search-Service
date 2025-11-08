@@ -40,6 +40,98 @@ class CFModel:
         self.item_factors = model.item_factors
         return self
 
+    def save(self, filepath: str) -> None:
+      """Save trained model to disk"""
+      if self.model is None:
+          raise ValueError("No model to save. Train first.")
+      
+      model_data = {
+          'user_factors': self.user_factors,
+          'item_factors': self.item_factors,
+          'use_gpu': self.use_gpu,
+          'model_params': {
+              'factors': self.model.factors,
+              'regularization': self.model.regularization,
+              'iterations': self.model.iterations,
+          }
+        }
+      
+      Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+      with open(filepath, 'wb') as f:
+          pickle.dump(model_data, f)
+      
+      print(f"Model saved to {filepath}")
+    
+    def load(self, filepath: str) -> "CFModel":
+        """Load trained model from disk"""
+        with open(filepath, 'rb') as f:
+            model_data = pickle.load(f)
+        
+        # Reconstruct model
+        params = model_data['model_params']
+        self.model = AlternatingLeastSquares(
+            factors=params['factors'],
+            regularization=params['regularization'],
+            iterations=params['iterations'],
+            use_gpu=model_data['use_gpu'],
+            calculate_training_loss=False,
+            num_threads=0,
+        )
+        
+        # Restore factors
+        self.model.user_factors = model_data['user_factors']
+        self.model.item_factors = model_data['item_factors']
+        self.user_factors = model_data['user_factors']
+        self.item_factors = model_data['item_factors']
+        
+        print(f"Model loaded from {filepath}")
+        return self
+    
+    def partial_fit(
+        self,
+        new_interactions: List[Tuple[int, int, float]],
+        user_id_to_index: Dict[int, int],
+        item_id_to_index: Dict[int, int],
+        learning_rate: float = 0.01,
+        iterations: int = 5
+    ) -> "CFModel":
+        """Incrementally update model with new interactions
+        
+        Args:
+            new_interactions: List of (user_id, job_id, weight)
+            learning_rate: Step size for gradient descent
+            iterations: Number of update iterations
+        """
+        if self.model is None:
+            raise ValueError("Model not trained. Call train() first.")
+        
+        # Update user/item factors for new interactions only
+        for user_id, job_id, weight in new_interactions:
+            uidx = user_id_to_index.get(user_id)
+            iidx = item_id_to_index.get(job_id)
+            
+            if uidx is None or iidx is None:
+                continue
+            
+            # Gradient descent update (simplified ALS step)
+            for _ in range(iterations):
+                user_vec = self.user_factors[uidx]
+                item_vec = self.item_factors[iidx]
+                
+                # Prediction error
+                pred = np.dot(user_vec, item_vec)
+                error = weight - pred
+                
+                # Update factors
+                self.user_factors[uidx] += learning_rate * error * item_vec
+                self.item_factors[iidx] += learning_rate * error * user_vec
+        
+        # Update model's factors
+        self.model.user_factors = self.user_factors
+        self.model.item_factors = self.item_factors
+        
+        return self
+    
     def score(
         self,
         user_id: int,
