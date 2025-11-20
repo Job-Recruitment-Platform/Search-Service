@@ -30,7 +30,7 @@ class RedisStreamConsumer:
     def _setup_consumer_group(self):
         """
         Setup Redis consumer group for outbox pattern
-        
+
         Creates consumer group if it doesn't exist, following the pattern
         described in OUTBOX_PATTERN_ARCHITECTURE.md
         """
@@ -46,7 +46,7 @@ class RedisStreamConsumer:
                     f"Stream '{self.stream_name}' does not exist yet. "
                     f"It will be created when first message arrives."
                 )
-            
+
             # Try to create consumer group starting from the beginning (id="0")
             # mkstream=True ensures stream is created if it doesn't exist
             self.redis_client.xgroup_create(
@@ -73,7 +73,8 @@ class RedisStreamConsumer:
                         count=10
                     )
                     if pending:
-                        logger.info(f"Found {len(pending)} pending message(s) in consumer group")
+                        logger.info(
+                            f"Found {len(pending)} pending message(s) in consumer group")
                 except:
                     pass
             else:
@@ -83,7 +84,7 @@ class RedisStreamConsumer:
     def process_messages(self, count: int = 10, block: int = 5000):
         """
         Read and process messages from Redis stream
-        
+
         Follows the outbox pattern implementation:
         - Reads from consumer group using xreadgroup
         - Processes messages with 8 fields (id, aggregateType, aggregateId, 
@@ -107,17 +108,19 @@ class RedisStreamConsumer:
 
             processed_count = 0
             for stream, message_list in messages:
-                logger.info(f"Received {len(message_list)} message(s) from stream '{stream}'")
-                
+                logger.info(
+                    f"Received {len(message_list)} message(s) from stream '{stream}'")
+
                 for message_id, fields in message_list:
                     try:
                         logger.info(
                             f"Processing message {message_id} from stream '{stream}'"
-                        )                        
+                        )
                         # Process the message fields directly
                         # Fields contain: id, aggregateType, aggregateId, eventType,
                         # payload, occurredAt, traceId, attempts
-                        result = self.sync_processor.process_stream_message(fields)
+                        result = self.sync_processor.process_stream_message(
+                            fields)
                         processed_count += result.processed
 
                         # Acknowledge message after successful processing
@@ -154,30 +157,44 @@ class RedisStreamConsumer:
             return 0
 
     def run(self):
-        """
-        Run the consumer continuously
-        
-        Continuously reads from Redis stream and processes outbox events.
-        Handles interrupts gracefully and implements retry logic for failures.
-        """
+        """Run the consumer continuously"""
         self.running = True
-        logger.info(
-            f"Starting Redis stream consumer: consumer='{self.consumer_name}' "
-            f"group='{self.consumer_group}' stream='{self.stream_name}'"
-        )
+        logger.info("Starting Redis stream consumer...")
+
+        retry_count = 0
+        max_retries = 5
 
         while self.running:
             try:
                 processed = self.process_messages()
                 if processed > 0:
-                    logger.debug(f"Processed {processed} messages in this cycle")
+                    logger.debug(f"Processed {processed} messages")
+
+                # Reset retry count on success
+                retry_count = 0
+
             except KeyboardInterrupt:
-                logger.info("Received interrupt signal, shutting down gracefully...")
-                self.stop()
+                logger.info("Consumer interrupted by user")
+                self.running = False
                 break
+
             except Exception as e:
-                logger.exception(f"Error in consumer loop: {e}")
-                time.sleep(5)  # Wait before retrying on error
+                retry_count += 1
+                logger.error(
+                    f"Error in consumer loop (attempt {retry_count}/{max_retries}): {e}")
+
+                if retry_count >= max_retries:
+                    logger.error("Max retries reached, consumer stopping")
+                    self.running = False
+                    break
+
+                # Exponential backoff
+                import time
+                wait_time = min(2 ** retry_count, 60)
+                logger.info(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+
+        logger.info("Redis stream consumer stopped")
 
     def stop(self):
         """Stop the consumer"""
@@ -185,4 +202,3 @@ class RedisStreamConsumer:
         self.running = False
         if self.redis_client:
             self.redis_client.close()
-
