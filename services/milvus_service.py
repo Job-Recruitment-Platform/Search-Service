@@ -113,11 +113,10 @@ class MilvusService:
                 model_name=Config.EMBEDDING_MODEL_NAME,
                 device=Config.EMBEDDING_DEVICE,
                 use_fp16=Config.EMBEDDING_USE_FP16,
-                return_dense=True,
-                return_sparse=True,
             )
             self.dense_dim = self.ef.dim["dense"]
             logger.info("Initialized BGEM3 embedding function")
+
             # Setup collection
             self.jobs_collection = self._setup_collection(
                 jobs_collection_schema)

@@ -13,6 +13,7 @@ RUN apt-get update && \
     gcc \
     g++ \
     git \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create venv
@@ -75,6 +76,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create user FIRST (before copying files)

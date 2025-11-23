@@ -3,6 +3,9 @@ import math
 import json
 from datetime import datetime, timezone
 from collections import Counter, defaultdict
+from threading import Lock 
+from pathlib import Path   
+import logging             
 import redis
 import numpy as np
 import os
@@ -14,6 +17,7 @@ import time
 from services.milvus_service import MilvusService
 from app.config import INTERACTION_WEIGHTS, Config
 
+logger = logging.getLogger(__name__)
 
 class RecommendationService:
     def __init__(self, milvus_service: MilvusService):
@@ -23,6 +27,9 @@ class RecommendationService:
         self.cf_user_id_to_index = None
         self.cf_item_id_to_index = None
         self.cf_index_to_item_id = None
+        self.cf_index_to_user_id = None
+        self.model_load_lock = Lock()
+        self.last_model_mtime = None
         self._load_cf_model()
         # Initialize Redis client for short-term vector caching
         try:
@@ -127,21 +134,58 @@ class RecommendationService:
 
         return list(candidate_map.values())
 
-    def _load_cf_model(self) -> None:
-        """Load CF model and mappings from pickle if available."""
+    def _load_cf_model(self, force_reload: bool = False) -> bool:
+        """Load CF model with hot reload support
+        
+        Args:
+            force_reload: Force reload even if file hasn't changed
+            
+        Returns:
+            True if model was loaded/reloaded, False otherwise
+        """
         try:
             path = getattr(Config, "CF_MODEL_PATH", "")
-            if not path or not os.path.exists(path):
-                return
-            with open(path, "rb") as f:
-                data = pickle.load(f)
-            self.cf_model = data.get("model")
-            self.cf_user_id_to_index = data.get("user_id_to_index")
-            self.cf_item_id_to_index = data.get("item_id_to_index")
-            self.cf_index_to_item_id = data.get("index_to_item_id")
+            if not path:
+                logger.warning("CF_MODEL_PATH not configured")
+                return False
+            
+            model_path = Path(path)
+            if not model_path.exists():
+                logger.warning(f"CF model not found at {model_path}")
+                return False
+            
+            # Check if model file changed
+            current_mtime = model_path.stat().st_mtime
+            
+            if not force_reload and self.last_model_mtime == current_mtime:
+                # Model unchanged
+                return False
+            
+            # Load model with thread safety
+            with self.model_load_lock:
+                logger.info(f"Loading CF model from {model_path}...")
+                
+                with open(model_path, "rb") as f:
+                    data = pickle.load(f)
+                
+                self.cf_model = data.get("model")
+                self.cf_user_id_to_index = data.get("user_id_to_index", {})
+                self.cf_item_id_to_index = data.get("item_id_to_index", {})
+                self.cf_index_to_item_id = data.get("index_to_item_id", {})
+                self.cf_index_to_user_id = data.get("index_to_user_id", {})
+                
+                self.last_model_mtime = current_mtime
+                
+                logger.info(
+                    f"✓ CF model loaded: {len(self.cf_user_id_to_index)} users, "
+                    f"{len(self.cf_item_id_to_index)} jobs"
+                )
+                
+                return True
+                
         except Exception as e:
-            print(f"Warning: Failed to load CF model: {e}")
-            self.cf_model = None
+            logger.error(f"Failed to load CF model: {e}")
+            return False
 
     def _generate_cf_candidates(self, user_id: int, limit: int) -> List[Dict[str, Any]]:
         """Sinh candidate từ mô hình CF (ALS); trả [] nếu không khả dụng."""
@@ -1149,3 +1193,17 @@ class RecommendationService:
     ) -> List[Dict[str, Any]]:
         """Placeholder: trả về danh sách job phổ biến."""
         return []
+    
+    def reload_model(self) -> bool:
+        """Force reload CF model (called by hot reload endpoint)"""
+        try:
+            logger.info("Force reloading CF model...")
+            success = self._load_cf_model(force_reload=True)
+            if success:
+                logger.info("✓ Model reloaded successfully")
+            else:
+                logger.warning("Model reload failed or model unchanged")
+            return success
+        except Exception as e:
+            logger.error(f"Reload error: {e}")
+            return False
