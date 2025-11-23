@@ -13,20 +13,21 @@ class Config:
     # Milvus configuration
     MILVUS_HOST: str = os.getenv("MILVUS_HOST", "localhost")
     MILVUS_PORT: str = os.getenv("MILVUS_PORT", "19530")
-    
+
     # API python
     API_SERVER_HOST = os.getenv("API_SERVER_HOST", "localhost")
-    
+
     # Internal token
-    INTERNAL_API_TOKEN: str = os.getenv("INTERNAL_API_TOKEN", "68527e7f-4c0c-4c02-8df2-9c5b639cee77")
-    
+    INTERNAL_API_TOKEN: str = os.getenv(
+        "INTERNAL_API_TOKEN", "68527e7f-4c0c-4c02-8df2-9c5b639cee77")
+
     # Postgres
     POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
     POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
     POSTGRES_USERNAME = os.getenv("POSTGRES_USERNAME", "root")
     POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "niggamove")
     POSTGRES_DB = os.getenv("POSTGRES_DB", "jrp")
-    
+
     # Redis configuration
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
@@ -61,6 +62,7 @@ class Config:
     # CF model configuration
     CF_MODEL_PATH: str = os.getenv(
         "CF_MODEL_PATH", "CFModel/models/cf_model.pkl")
+    TRAINING_SCHEDULE_TIME: str = os.getenv("TRAINING_SCHEDULE_TIME", "02:00")
 
 
 INTERACTION_WEIGHTS = {

@@ -135,9 +135,10 @@ def train_pipeline():
     logger.info("=== Retraining Pipeline Completed ===")
     
 def run_scheduler():
-    schedule.every().day.at("02:00").do(train_pipeline)
+    schedule_time = getattr(Config, 'TRAINING_SCHEDULE_TIME', '02:00')
+    schedule.every().day.at(schedule_time).do(train_pipeline)
 
-    logger.info("Scheduler started. Waiting for next scheduled job...")
+    logger.info(f"Scheduler started. Training scheduled at: {schedule_time}")
     logger.info("Next run at: %s", schedule.next_run())
 
     while True:
