@@ -37,7 +37,10 @@ RUN pip install \
     numpy==1.26.2 \
     python-dotenv==1.0.0 \
     scipy==1.11.4 \
-    requests==2.31.0
+    requests==2.31.0 \
+    schedule==1.2.0 \
+    psycopg2-binary==2.9.9 \
+    implicit==0.7.2
 
 # Install pymilvus dependencies
 RUN pip install \
@@ -77,6 +80,7 @@ RUN apt-get update && \
     curl \
     ca-certificates \
     libpq5 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create user FIRST (before copying files)
