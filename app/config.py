@@ -32,10 +32,20 @@ class Config:
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
-    REDIS_STREAM_NAME: str = os.getenv("REDIS_STREAM_NAME", "outbox-events")
-    REDIS_CONSUMER_GROUP: str = os.getenv(
-        "REDIS_CONSUMER_GROUP", "milvus-sync")
-    REDIS_CONSUMER_NAME: str = os.getenv("REDIS_CONSUMER_NAME", "worker-1")
+
+    # Stream 1: Outbox Events (Job sync to Milvus)
+    # Consumed by: OutboxEventConsumer
+    # Message format: {id, aggregateType, aggregateId, eventType, payload, occurredAt, traceId, attempts}
+    OUTBOX_STREAM_NAME: str = "outbox-events"
+    OUTBOX_CONSUMER_GROUP: str = "outbox-processor-group"
+    OUTBOX_CONSUMER_NAME: str = "python-sync-worker-1"
+
+    # Stream 2: User Interactions (Recommendation signals)
+    # Consumed by: InteractionConsumer
+    # Message format: {accountId, jobId, eventType, metadata, occurredAt}
+    INTERACTION_STREAM_NAME: str = "user-interactions"
+    INTERACTION_CONSUMER_GROUP: str = "recommend-service-group"
+    INTERACTION_CONSUMER_NAME: str = "python-recommend-worker-1"
 
     # Embedding model configuration
     EMBEDDING_MODEL_NAME: str = os.getenv(

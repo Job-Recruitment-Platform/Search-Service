@@ -3,9 +3,9 @@ import math
 import json
 from datetime import datetime, timezone
 from collections import Counter, defaultdict
-from threading import Lock 
-from pathlib import Path   
-import logging             
+from threading import Lock
+from pathlib import Path
+import logging
 import redis
 import numpy as np
 import os
@@ -18,6 +18,7 @@ from services.milvus_service import MilvusService
 from app.config import INTERACTION_WEIGHTS, Config
 
 logger = logging.getLogger(__name__)
+
 
 class RecommendationService:
     def __init__(self, milvus_service: MilvusService):
@@ -136,10 +137,10 @@ class RecommendationService:
 
     def _load_cf_model(self, force_reload: bool = False) -> bool:
         """Load CF model with hot reload support
-        
+
         Args:
             force_reload: Force reload even if file hasn't changed
-            
+
         Returns:
             True if model was loaded/reloaded, False otherwise
         """
@@ -148,41 +149,41 @@ class RecommendationService:
             if not path:
                 logger.warning("CF_MODEL_PATH not configured")
                 return False
-            
+
             model_path = Path(path)
             if not model_path.exists():
                 logger.warning(f"CF model not found at {model_path}")
                 return False
-            
+
             # Check if model file changed
             current_mtime = model_path.stat().st_mtime
-            
+
             if not force_reload and self.last_model_mtime == current_mtime:
                 # Model unchanged
                 return False
-            
+
             # Load model with thread safety
             with self.model_load_lock:
                 logger.info(f"Loading CF model from {model_path}...")
-                
+
                 with open(model_path, "rb") as f:
                     data = pickle.load(f)
-                
+
                 self.cf_model = data.get("model")
                 self.cf_user_id_to_index = data.get("user_id_to_index", {})
                 self.cf_item_id_to_index = data.get("item_id_to_index", {})
                 self.cf_index_to_item_id = data.get("index_to_item_id", {})
                 self.cf_index_to_user_id = data.get("index_to_user_id", {})
-                
+
                 self.last_model_mtime = current_mtime
-                
+
                 logger.info(
                     f"✓ CF model loaded: {len(self.cf_user_id_to_index)} users, "
                     f"{len(self.cf_item_id_to_index)} jobs"
                 )
-                
+
                 return True
-                
+
         except Exception as e:
             logger.error(f"Failed to load CF model: {e}")
             return False
@@ -1101,16 +1102,16 @@ class RecommendationService:
 
     def _is_duplicate_interaction(self, interaction_id: str) -> bool:
         """Kiểm tra interaction đã được xử lý chưa (deduplication).
-        
+
         Args:
             interaction_id: ID của interaction event (aggregateId từ outbox)
-            
+
         Returns:
             True nếu interaction đã được xử lý, False nếu chưa
         """
         if not self.redis_client or not interaction_id:
             return False
-        
+
         try:
             key = f"processed_interaction:{interaction_id}"
             exists = self.redis_client.exists(key)
@@ -1121,13 +1122,13 @@ class RecommendationService:
 
     def _mark_interaction_processed(self, interaction_id: str) -> None:
         """Đánh dấu interaction đã được xử lý (TTL 7 ngày).
-        
+
         Args:
             interaction_id: ID của interaction event (aggregateId từ outbox)
         """
         if not self.redis_client or not interaction_id:
             return
-        
+
         try:
             key = f"processed_interaction:{interaction_id}"
             self.redis_client.setex(key, 7 * 24 * 3600, "1")
@@ -1193,7 +1194,7 @@ class RecommendationService:
     ) -> List[Dict[str, Any]]:
         """Placeholder: trả về danh sách job phổ biến."""
         return []
-    
+
     def reload_model(self) -> bool:
         """Force reload CF model (called by hot reload endpoint)"""
         try:

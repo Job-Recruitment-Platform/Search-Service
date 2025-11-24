@@ -1,12 +1,9 @@
 """Search service for job search operations"""
 import logging
-import time
 from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime, timezone
 from services.milvus_service import MilvusService
 from app.config import Config
-from models.search import SearchWeights
-from models.embeddings import Embeddings
 from models.pagination import PaginationInfo
 from pymilvus import AnnSearchRequest, WeightedRanker
 
