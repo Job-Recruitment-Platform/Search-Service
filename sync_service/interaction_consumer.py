@@ -81,12 +81,17 @@ class InteractionConsumer:
             conn = self._get_db_connection()
             cursor = conn.cursor()
 
+            import hashlib
+            external_id = hashlib.md5(
+                f"{event.account_id}_{event.job_id}_{event.event_type.value}_{event.occurred_at}".encode()
+            ).hexdigest()[:64]
+
             # Insert into user_interactions table
             query = """
                 INSERT INTO user_interactions 
-                (account_id, job_id, event_type, occurred_at, metadata)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (account_id, job_id, event_type, occurred_at) 
+                (account_id, job_id, event_type, occurred_at, metadata, external_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (external_id) 
                 DO NOTHING
             """
 
@@ -96,7 +101,8 @@ class InteractionConsumer:
                 event.event_type.value,
                 event.occurred_at,
                 psycopg2.extras.Json(
-                    event.metadata) if event.metadata else None
+                    event.metadata) if event.metadata else None,
+                external_id
             ))
 
             conn.commit()
